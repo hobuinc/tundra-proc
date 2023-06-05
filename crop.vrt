@@ -1,0 +1,10 @@
+<OGRVRTDataSource>
+    <OGRVRTWarpedLayer>
+        <OGRVRTLayer name="CROP">
+            <SrcDataSource>HDZ-ATLS-CROP.kml</SrcDataSource>
+            <SrcLayer>HDZ-ATLS-CROP.kml</SrcLayer>
+            <LayerSRS>EPSG:4326</LayerSRS>
+        </OGRVRTLayer>
+        <TargetSRS>EPSG:32606</TargetSRS>
+    </OGRVRTWarpedLayer>
+</OGRVRTDataSource>

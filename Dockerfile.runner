@@ -1,0 +1,92 @@
+ARG BASE_IMAGE="ubuntu:22.04"
+
+FROM --platform=$TARGETPLATFORM condaforge/mambaforge:latest as condasetup
+LABEL MAINTAINER="Howard Butler <howard@hobu.co>"
+
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG TARGETVARIANT
+RUN printf "I'm building for TARGETPLATFORM=${TARGETPLATFORM}" \
+    && printf ", TARGETARCH=${TARGETARCH}" \
+    && printf ", TARGETVARIANT=${TARGETVARIANT} \n" \
+    && printf "With uname -s : " && uname -s \
+    && printf "and  uname -m : " && uname -mm
+
+ENV CONDA_ENV_NAME "pdal"
+ENV CONDAENV "/opt/conda/envs/${CONDA_ENV_NAME}"
+
+
+COPY build-environment.yml .
+RUN mamba env create -f build-environment.yml
+
+
+COPY run-environment.yml .
+RUN mamba env create -f run-environment.yml
+
+
+SHELL ["conda", "run", "-n", "build", "/bin/bash", "-c"]
+
+
+RUN git clone https://github.com/hobu/OpenPointClass.git opc &&  \
+    cd opc && \
+    mkdir build &&  cd build && \
+    cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release  -DWITH_GBT=OFF -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX && \
+    ninja && \
+    cp pcclassify "/opt/conda/envs/pdal/bin" && \
+    cp pctrain "/opt/conda/envs/pdal/bin"
+
+RUN mkdir rivlib
+
+ADD support-libraries/rivlib-2_6_0-arm_64-linux-gcc9.zip rivlib
+RUN cd rivlib && unzip rivlib-2_6_0-arm_64-linux-gcc9.zip
+
+RUN git clone https://github.com/PDAL/PDAL.git pdal && \
+    cd pdal && \
+    cd /pdal/plugins/rxp && \
+    mkdir build && cd build && \
+    cmake .. \
+        -DRiVLib_DIR=/rivlib/rivlib-2_6_0-arm_64-linux-gcc9/cmake/ \
+        -DBUILD_PLUGIN_RIVLIB=ON \
+        -DSTANDALONE=ON \
+        -DCMAKE_INSTALL_PREFIX="/opt/conda/envs/pdal" -G Ninja && \
+    ninja && \
+    ninja install
+
+
+
+RUN conda-pack -n ${CONDA_ENV_NAME} --dest-prefix=/var/task -o /tmp/env.tar && \
+     mkdir /venv && cd /venv && tar xf /tmp/env.tar  && \
+     rm /tmp/env.tar
+
+
+
+FROM --platform=$TARGETPLATFORM ${BASE_IMAGE:?} as al2
+
+ARG BASE_IMAGE
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
+ENV CONDAENV "/var/task"
+ENV CONDA_PREFIX "/var/task"
+ENV TARGETPLATFORM "${TARGETPLATFORM}"
+COPY --from=condasetup /venv ${CONDAENV}
+COPY entry.sh /var/bin/entry.sh
+RUN chmod 655 /var/bin/entry.sh
+
+
+
+ENV PROJ_LIB ${CONDAENV}/share/proj
+ENV PROJ_NETWORK=TRUE
+ENV PATH $PATH:${CONDAENV}/bin
+ENV DTED_APPLY_PIXEL_IS_POINT=TRUE
+ENV GTIFF_REPORT_COMPD_CS=TRUE
+ENV REPORT_COMPD_CS=TRUE
+ENV OAMS_TRADITIONAL_GIS_ORDER=TRUE
+ENV XDG_DATA_HOME=${CONDAENV}/share
+ENV LD_LIBRARY_PATH=${CONDAENV}/lib
+ENV NODE_PATH=/var/task/lib/node_modules
+
+SHELL [ "/bin/bash", "--login", "-c" ]
+
+ENTRYPOINT [ "/var/bin/entry.sh" ]
+

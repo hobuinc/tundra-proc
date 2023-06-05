@@ -1,0 +1,27 @@
+name: pdal
+channels:
+  - conda-forge
+dependencies:
+  - python-pdal
+  - python=3.11
+  - untwine
+  - aws-sdk-cpp
+  - shapely
+  - gdal
+  - pyproj
+  - pystac
+  - stactools
+  - nodejs
+  - whitebox_tools
+  - boto3
+  - awscli
+  - pip
+  - eigen
+  - matplotlib
+  - unzip
+  - untwine
+  - sysroot_linux-64=2.17
+  - pip:
+    - trenchrun
+    - s3pathlib
+    - ept-python
