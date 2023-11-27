@@ -108,18 +108,26 @@ def rxp_pipeline(rxpfilename):
                                     )
     if 'MAIN' in options['basename']:
         dtm_filename = options['dtm_filename']
-        writer = las_writer | pdal.Writer.gdal(str(dtm_filename),
+        dsm_filename = options['dsm_filename']
+        dtm_writer = las_writer | pdal.Writer.gdal(str(dtm_filename),
                                                 resolution=0.25,
                                                 output_type="idw",
                                                 data_type="float32",
                                                 where="Classification == 2",
                                                 gdalopts="COMPRESS=LERC, TILED=YES, MAX_Z_ERROR=0.001"
                                     )
+        dsm_writer = dtm_writer | pdal.Writer.gdal(str(dsm_filename),
+                                                resolution=0.25,
+                                                output_type="idw",
+                                                data_type="float32",
+                                                where="Classification != 7",
+                                                gdalopts="COMPRESS=LERC, TILED=YES, MAX_Z_ERROR=0.001"
+                                    )
     else:
-        writer = las_writer
+        dtm_writer = las_writer
 
 
-    return writer
+    return dsm_writer
 
 
 def pivox_pipeline(filename):
@@ -166,14 +174,22 @@ def pivox_pipeline(filename):
                                     offset_z="auto"
                                     )
     dtm_filename = options['dtm_filename']
-    writer = las_writer | pdal.Writer.gdal(str(dtm_filename),
+    dsm_filename = options['dsm_filename']
+    dtm_writer = las_writer | pdal.Writer.gdal(str(dtm_filename),
                                             resolution=0.25,
                                             output_type="idw",
                                             data_type="float32",
                                             where="Classification == 2",
                                             gdalopts="COMPRESS=LERC, TILED=YES, MAX_Z_ERROR=0.001")
 
-    return writer
+    dsm_writer = dtm_writer | pdal.Writer.gdal(str(dsm_filename),
+                                            resolution=0.25,
+                                            output_type="idw",
+                                            data_type="float32",
+                                            where="Classification != 7",
+                                            gdalopts="COMPRESS=LERC, TILED=YES, MAX_Z_ERROR=0.001")
+
+    return dsm_writer
 
 
 def cleanup(tmpdir):
@@ -204,14 +220,18 @@ def upload():
             path.write_bytes(f.read())
 
     if 'PIVOX' in str(options['copc_filename']):
-        push(options['copc_filename'], 'pivox-laz-classified')
-        if options['dtm_filename'].exists():
-            push(options['dtm_filename'], 'pivox-dtm')
+#         push(options['copc_filename'], 'pivox-laz-classified')
+#         if options['dtm_filename'].exists():
+#             push(options['dtm_filename'], 'pivox-dtm')
+        if options['dsm_filename'].exists():
+            push(options['dsm_filename'], 'pivox-dsm')
 
     else:
-        push(options['copc_filename'], 'atls-laz-classified')
-        if options['dtm_filename'].exists():
-            push(options['dtm_filename'], 'atls-dtm-cropped')
+#         push(options['copc_filename'], 'atls-laz-classified')
+        if options['dsm_filename'].exists():
+            push(options['dsm_filename'], 'atls-dsm-cropped')
+#         if options['dtm_filename'].exists():
+#             push(options['dtm_filename'], 'atls-dtm-cropped')
 
 
 def run_copc_pipeline():
@@ -252,10 +272,12 @@ if __name__ == '__main__':
     copc_filename = make_tempfile(options['basename'], '.copc.laz')
     las_filename = make_tempfile(options['basename'], '.las')
     dtm_filename = make_tempfile(options['basename'], '.tif')
+    dsm_filename = make_tempfile(options['basename'], '.tif')
     pipeline_filename = make_tempfile(options['basename'], '.json')
     options['copc_filename'] = copc_filename
     options['las_filename'] = las_filename
     options['dtm_filename'] = dtm_filename
+    options['dsm_filename'] = dsm_filename
     options['pipeline_filename'] = pipeline_filename
 
     try:
